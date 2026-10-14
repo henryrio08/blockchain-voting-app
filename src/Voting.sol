@@ -53,6 +53,34 @@ contract Voting {
             emit CandidateAdded(i, candidateNames[i]);
         }
     }
+     function vote(uint256 candidateId) external {
+        if (block.timestamp >= deadline) revert ElectionClosed();
+        if (hasVoted[msg.sender]) revert AlreadyVoted(msg.sender);
+        if (candidateId >= candidates.length) revert InvalidCandidate(candidateId);
+        hasVoted[msg.sender] = true;
+        candidates[candidateId].voteCount += 1;
+        emit VoteCast(msg.sender, candidateId);
+    }
 
+    function getCandidate(uint256 candidateId)
+        external
+        view
+        returns (string memory name, uint256 voteCount)
+    {
+        if (candidateId >= candidates.length) revert InvalidCandidate(candidateId);
+        Candidate storage candidate = candidates[candidateId];
+        return (candidate.name, candidate.voteCount);
+    }
 
+    function candidateCount() external view returns (uint256) {
+        return candidates.length;
+    }
+
+    function results() external view returns (Candidate[] memory) {
+        return candidates;
+    }
+
+    function isOpen() external view returns (bool) {
+        return block.timestamp < deadline;
+    }
 }
