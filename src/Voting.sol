@@ -19,4 +19,18 @@ contract Voting {
         string name;
         uint256 voteCount;
     }
+    address public immutable owner;
+    string public title;
+    uint256 public immutable deadline;
+    Candidate[] private candidates;
+    mapping(address voter => bool) public hasVoted;
+
+    event VoteCast(address indexed voter, uint256 indexed candidateId);
+    event CandidateAdded(uint256 indexed candidateId, string name);
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
 }
