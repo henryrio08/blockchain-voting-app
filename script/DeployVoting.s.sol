@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console2} from "forge-std/Script.sol";
-import {Voting} from "../src/Voting.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { Voting } from "../src/Voting.sol";
 
 contract DeployVoting is Script {
     function run() external returns (Voting voting) {
