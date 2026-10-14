@@ -27,7 +27,9 @@ Edit `.env.local` and set the RPC URL, chain ID, and deployed contract address.
 2. Copy its HTTPS RPC URL into `VITE_RPC_URL`.
 3. Set `VITE_CHAIN_ID=11155111`.
 4. Deploy the contract to Sepolia with a disposable test wallet and put the resulting address in `VITE_CONTRACT_ADDRESS`.
-5. Add Sepolia to MetaMask and obtain Sepolia test ETH from a reputable faucet.
+5. Add Sepolia to MetaMask.
+6. To enable gas sponsorship, create an active **Gas Sponsorship** policy for your Alchemy app and Ethereum Sepolia in the Alchemy dashboard. Start with conservative per-transaction and total spend/count limits. Copy the app API key and policy ID into the optional variables below.
+7. Obtain Sepolia test ETH only if you need to deploy or test the unsponsored fallback; eligible sponsored votes should not require the voter to hold Sepolia ETH.
 
 Example:
 
@@ -35,6 +37,10 @@ Example:
 VITE_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_API_KEY
 VITE_CHAIN_ID=11155111
 VITE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
+
+# Optional: turn on Alchemy-sponsored vote calls (requires an active Sepolia policy)
+VITE_ALCHEMY_API_KEY=YOUR_ALCHEMY_API_KEY
+VITE_ALCHEMY_POLICY_ID=YOUR_GAS_SPONSORSHIP_POLICY_ID
 ```
 
 ### Local Anvil
@@ -78,8 +84,15 @@ npm run preview
 
 - `src/contract.ts`: minimal ABI, chain configuration, and provider helpers.
 - Alchemy/local RPC provider: reads election data without requiring a wallet connection.
-- MetaMask: exposes the connected account, signs vote transactions, and asks the user to approve each transaction.
+- MetaMask: exposes the connected account and approves the user's signatures. The app never asks for a private key.
+- `src/sponsoredVoting.ts`: optional Alchemy Wallet APIs flow. When both sponsorship settings are present, it submits the vote through Alchemy's smart-wallet client with the configured policy ID and waits for confirmation.
 - `src/App.tsx`: election dashboard, candidate vote counts, wallet/network handling, and transaction feedback.
+
+### Gas sponsorship behavior
+
+Gas sponsorship is **optional and only configured for Sepolia** in this demo. If both `VITE_ALCHEMY_API_KEY` and `VITE_ALCHEMY_POLICY_ID` are set, vote submissions use Alchemy Wallet APIs and request sponsorship. Alchemy only covers the fee if the policy is active, the network is enabled, and the transaction passes its policy rules. If those variables are not set, the app uses a normal MetaMask transaction, which requires the voter to have Sepolia ETH.
+
+The first sponsored transaction may ask MetaMask to approve an EIP-7702 delegation as well as the transaction, depending on the wallet and SDK. Review every prompt before signing. The public frontend API key and policy ID are not secrets; restrict the key by allowed origins and usage limits. Never add a wallet private key to a `VITE_*` variable.
 
 The app never asks for or handles a private key. The Alchemy key is embedded in frontend browser requests because Vite's `VITE_*` variables are public client-side configuration, not secrets. Restrict the Alchemy key by allowed origins and usage limits in the Alchemy dashboard; never put a wallet private key in a `VITE_*` variable.
 
