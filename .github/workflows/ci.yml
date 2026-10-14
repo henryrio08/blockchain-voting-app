@@ -16,12 +16,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Install forge-std
-        run: forge install foundry-rs/forge-std --no-git
 
       - name: Check Solidity formatting
         run: forge fmt --check
