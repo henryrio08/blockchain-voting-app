@@ -33,4 +33,26 @@ contract Voting {
         _;
     }
 
+    constructor(
+        string memory electionTitle,
+        string[] memory candidateNames,
+        uint256 votingDeadline
+    ) {
+        if (bytes(electionTitle).length == 0) revert EmptyTitle();
+        if (candidateNames.length == 0) revert NoCandidates();
+        if (candidateNames.length > 100) revert TooManyCandidates();
+        if (votingDeadline <= block.timestamp) revert InvalidDeadline();
+
+        owner = msg.sender;
+        title = electionTitle;
+        deadline = votingDeadline;
+
+        for (uint256 i; i < candidateNames.length; ++i) {
+            if (bytes(candidateNames[i]).length == 0) revert EmptyTitle();
+            candidates.push(Candidate({name: candidateNames[i], voteCount: 0}));
+            emit CandidateAdded(i, candidateNames[i]);
+        }
+    }
+
+
 }
