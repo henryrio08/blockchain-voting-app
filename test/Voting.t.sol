@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {Voting} from "../src/Voting.sol";
+import { Test } from "forge-std/Test.sol";
+import { Voting } from "../src/Voting.sol";
 
 contract VotingTest is Test {
     Voting private voting;
@@ -67,9 +67,7 @@ contract VotingTest is Test {
 
     function testCannotVoteForUnknownCandidate() public {
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(Voting.InvalidCandidate.selector, uint256(3))
-        );
+        vm.expectRevert(abi.encodeWithSelector(Voting.InvalidCandidate.selector, uint256(3)));
         voting.vote(3);
 
         assertFalse(voting.hasVoted(alice));
@@ -118,9 +116,7 @@ contract VotingTest is Test {
         string[] memory names = new string[](2);
         names[0] = "Candidate";
         names[1] = "";
-        vm.expectRevert(
-            abi.encodeWithSelector(Voting.EmptyCandidateName.selector, uint256(1))
-        );
+        vm.expectRevert(abi.encodeWithSelector(Voting.EmptyCandidateName.selector, uint256(1)));
         new Voting("Election", names, block.timestamp + 1 days);
     }
 
