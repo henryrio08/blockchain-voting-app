@@ -30,6 +30,7 @@ import {
   rpcUrl,
   type ElectionSnapshot,
 } from "./contract";
+import { gasSponsorshipConfigured, submitSponsoredVote } from "./sponsoredVoting";
 
 declare global {
   interface Window {
@@ -156,13 +157,19 @@ function App() {
     setVotingFor(candidateId);
     setNotice({ kind: "info", text: "Confirm the transaction in MetaMask. Your vote is not submitted until you approve it." });
     try {
-      const provider = getInjectedProvider();
-      const signer = await provider.getSigner();
-      const contract = getVotingContract(provider).connect(signer);
-      const tx = await contract.getFunction("vote")(candidateId);
-      setNotice({ kind: "info", text: `Transaction submitted: ${tx.hash.slice(0, 12)}… Waiting for confirmation.` });
-      await tx.wait();
-      setNotice({ kind: "success", text: "Vote confirmed on-chain. The results below are refreshing." });
+      if (gasSponsorshipConfigured) {
+        setNotice({ kind: "info", text: "Approve the sponsored vote request in MetaMask. Alchemy will attempt to cover the gas if the policy allows it." });
+        await submitSponsoredVote(account, candidateId);
+        setNotice({ kind: "success", text: "Sponsored vote confirmed. The results below are refreshing." });
+      } else {
+        const provider = getInjectedProvider();
+        const signer = await provider.getSigner();
+        const contract = getVotingContract(provider).connect(signer);
+        const tx = await contract.getFunction("vote")(candidateId);
+        setNotice({ kind: "info", text: `Transaction submitted: ${tx.hash.slice(0, 12)}… Waiting for confirmation.` });
+        await tx.wait();
+        setNotice({ kind: "success", text: "Vote confirmed on-chain. The results below are refreshing." });
+      }
       await loadElection(account);
     } catch (error) {
       setNotice({ kind: "error", text: describeError(error) });
