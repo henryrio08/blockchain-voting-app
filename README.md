@@ -20,9 +20,26 @@ A small educational smart-contract project demonstrating on-chain election setup
 - Solidity `^0.8.24`
 - Foundry: `forge`, `cast`, and `anvil`
 - GitHub Actions for continuous integration
-- Optional future extensions: a MetaMask frontend and Alchemy Account Kit
+- React + TypeScript frontend with MetaMask wallet connection
+- Alchemy-compatible RPC configuration for blockchain reads
+- GitHub Actions for Solidity checks and frontend build
 
-The contract and deployment script are implemented. A browser frontend, MetaMask connection flow, and Alchemy Account Kit gas sponsorship are **not implemented yet**.
+The frontend currently supports wallet connection, candidate/result display, network checks, and MetaMask-signed voting transactions. Alchemy Account Kit gas sponsorship is **not implemented**; Alchemy is used as an RPC provider.
+
+## Frontend: MetaMask and Alchemy
+
+See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to sign vote transactions. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election.
+
+From the repository root:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+The Alchemy RPC key used by a browser app is visible in network requests. Restrict it in Alchemy's dashboard; never put a wallet private key in frontend environment variables.
 
 ## Requirements
 
@@ -151,7 +168,7 @@ A green workflow means those checks passed in CI for that revision. Always inspe
 - **No coercion resistance:** voters can reveal how they voted.
 - **Fixed candidates and deadline:** they are selected at deployment.
 - **No professional audit:** the code is educational and must not be used for real elections.
-- **No frontend or gas sponsorship yet:** MetaMask UI and Alchemy Account Kit integration remain future work.
+- **No gas sponsorship yet:** Alchemy Account Kit integration remains future work.
 
 ## License
 
