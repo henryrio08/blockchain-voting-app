@@ -50,7 +50,7 @@ contract Voting {
                 revert EmptyCandidateName(i);
             }
 
-            candidates.push(Candidate({name: candidateNames[i], voteCount: 0}));
+            candidates.push(Candidate({ name: candidateNames[i], voteCount: 0 }));
             emit CandidateAdded(i, candidateNames[i]);
         }
     }
