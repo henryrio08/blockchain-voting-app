@@ -19,7 +19,6 @@ import {
   Vote,
   Zap,
 } from "lucide-react";
-import { formatEther } from "ethers";
 import {
   configuredChainId,
   contractAddress,
@@ -160,7 +159,7 @@ function App() {
       const provider = getInjectedProvider();
       const signer = await provider.getSigner();
       const contract = getVotingContract(provider).connect(signer);
-      const tx = await contract.vote(candidateId);
+      const tx = await contract.getFunction("vote")(candidateId);
       setNotice({ kind: "info", text: `Transaction submitted: ${tx.hash.slice(0, 12)}… Waiting for confirmation.` });
       await tx.wait();
       setNotice({ kind: "success", text: "Vote confirmed on-chain. The results below are refreshing." });
@@ -209,9 +208,6 @@ function App() {
       : `Closes ${new Date(election.deadline).toLocaleString()}`
     : "Awaiting contract setup";
 
-  const progress = election && election.totalVotes > 0
-    ? Math.max(...election.candidates.map((candidate) => candidate.voteCount)) / election.totalVotes
-    : 0;
 
   const networkMismatch = Boolean(account && walletChainId !== null && !isCorrectNetwork);
 
