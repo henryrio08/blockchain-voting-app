@@ -83,4 +83,11 @@ contract Voting {
     function isOpen() external view returns (bool) {
         return block.timestamp < deadline;
     }
+      function finalize() external view returns (Candidate[] memory) {
+        if (block.timestamp < deadline) revert ElectionStillOpen();
+        return candidates;
+    }
+
+
+
 }
