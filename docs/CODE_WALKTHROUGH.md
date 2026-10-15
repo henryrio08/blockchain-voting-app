@@ -139,3 +139,14 @@ Keep the local environment file out of commits. If you change .env.local, restar
 - Deployment requires test ETH unless you use a local chain such as Anvil.
 - The frontend RPC key and sponsorship policy ID are public browser configuration, not private credentials.
 - Never use this demo to run a real election.
+
+
+## Alchemy gas sponsorship details
+
+The frontend uses `@alchemy/wallet-apis` v5 with Viem to send the encoded `vote(candidateId)` call. This is Alchemy's current Wallet APIs approach and successor to the older Account Kit wallet-client package. It does not integrate Account Kit's embedded sign-in UI; MetaMask remains the signer.
+
+`frontend/src/sponsoredVoting.ts` checks that sponsorship settings exist, the configured chain is Sepolia, the contract address is valid, and the active MetaMask account and chain have not changed. It builds a Viem wallet client over MetaMask's injected provider, creates an Alchemy smart wallet client, configures the gas policy ID, ABI-encodes the vote call, submits it, and waits for the call status.
+
+The gas policy must allow the contract call and have available limits/budget. Alchemy can reject an ineligible call, and a configured policy does not guarantee sponsorship. The initial Wallet APIs interaction may require an EIP-7702 authorization in MetaMask. Never approve wallet prompts you do not understand.
+
+Environment variables prefixed with `VITE_` are public in the browser bundle. The Alchemy API key and policy ID must not be treated as private secrets; never place a wallet private key or seed phrase in the frontend.
