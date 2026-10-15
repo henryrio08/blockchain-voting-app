@@ -11,7 +11,7 @@ import {
 import { sepolia } from "viem/chains";
 import { contractAddress } from "./contract";
 
-// These settings are public in the browser bundle. Restrict the API key in Alchemy.
+// VITE_ values are public browser configuration, not private credentials.
 const alchemyApiKey = (import.meta.env.VITE_ALCHEMY_API_KEY || "").trim();
 const sponsorshipPolicyId = (import.meta.env.VITE_ALCHEMY_POLICY_ID || "").trim();
 
@@ -25,7 +25,7 @@ const votingAbi = [
   },
 ] as const;
 
-// If either setting is missing, App.tsx falls back to a normal MetaMask transaction.
+// The app uses a normal MetaMask transaction if sponsorship isn't configured.
 export const gasSponsorshipConfigured = Boolean(alchemyApiKey && sponsorshipPolicyId);
 
 export async function submitSponsoredVote(account: string, candidateId: number) {
@@ -43,10 +43,27 @@ export async function submitSponsoredVote(account: string, candidateId: number) 
   if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
     throw new Error("Set VITE_CONTRACT_ADDRESS to the deployed Voting contract address.");
   }
+  if (!Number.isSafeInteger(candidateId) || candidateId < 0) {
+    throw new Error("The selected candidate ID is invalid.");
+  }
 
-  // MetaMask remains the signer. Alchemy routes the signed call through its
-  // smart-wallet infrastructure so an eligible policy can cover transaction gas.
-  // MetaMask is still the signer. The app never handles the wallet's private key.
+  // Check the live wallet state again right before asking it to sign.
+  // This catches account/network changes that happen after the UI was rendered.
+  const [chainId, accounts] = await Promise.all([
+    window.ethereum.request({ method: "eth_chainId" }),
+    window.ethereum.request({ method: "eth_accounts" }),
+  ]);
+  if (typeof chainId !== "string" || Number.parseInt(chainId, 16) !== 11155111) {
+    throw new Error("Switch MetaMask to Sepolia before requesting gas sponsorship.");
+  }
+  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" ||
+      accounts[0].toLowerCase() !== account.toLowerCase()) {
+    throw new Error("Your active MetaMask account changed. Reconnect your wallet and try again.");
+  }
+
+  // MetaMask remains the signer; the app never handles the wallet's private key.
+  // Wallet APIs (the current successor to Account Kit's older wallet client)
+  // handle the smart-wallet transaction flow and request policy-based sponsorship.
   const signer = createWalletClient({
     account: account as Address,
     chain: sepolia,
@@ -56,22 +73,20 @@ export async function submitSponsoredVote(account: string, candidateId: number) 
     transport: alchemyWalletTransport({ apiKey: alchemyApiKey }),
     chain: sepolia,
     signer,
+    // Configure the sponsorship policy on the client using the current v5 SDK API.
+    paymaster: { policyId: sponsorshipPolicyId },
   });
 
-  // Encode vote(candidateId) using the same function signature as the Solidity contract.
+  // Encode vote(candidateId) using the function signature in Voting.sol.
   const data = encodeFunctionData({
     abi: votingAbi,
     functionName: "vote",
     args: [BigInt(candidateId)],
   });
 
-  // Ask Alchemy to sponsor this call if the policy rules allow it.
+  // The policy decides whether this call is eligible. If it isn't, this fails
+  // rather than silently claiming the vote was sponsored.
   const { id } = await client.sendCalls({
-    capabilities: {
-      paymaster: {
-        policyId: sponsorshipPolicyId,
-      },
-    },
     calls: [
       {
         to: contractAddress as Address,
@@ -81,7 +96,8 @@ export async function submitSponsoredVote(account: string, candidateId: number) 
     ],
   });
 
-  // A returned call ID means the request was accepted, not yet confirmed.
+  // A call ID is not a transaction hash. Wait for Alchemy's status before
+  // returning so the UI only reports success after the call flow completes.
   await client.waitForCallsStatus({ id });
   return id;
 }
