@@ -1,152 +1,115 @@
 # Code walkthrough
 
-This guide explains how the voting app works from the Solidity contract to the browser. The code comments explain why each step exists, in plain language.
+This is a guide to how I put the voting app together. I find it easiest to think of it as two parts: the contract, which enforces the rules, and the frontend, which lets someone use it.
 
-## How the pieces fit together
+## How a vote gets counted
 
-1. Voting.sol stores the election title, candidate list, deadline, and vote counts.
-2. Foundry compiles and tests the contract. A deployment command puts a copy of it on a blockchain.
-3. frontend/src/contract.ts tells the frontend which contract functions exist and how to connect to the network.
-4. frontend/src/App.tsx loads the election, connects MetaMask, checks the network, and handles the vote button.
-5. MetaMask asks the user to approve a transaction. The contract checks the vote and updates its state.
-6. The frontend reads the updated totals after the transaction is confirmed.
+1. The contract stores the election title, candidates, deadline, and vote counts.
+2. Foundry compiles and tests the contract. The deployment script can put it on a local chain or Sepolia.
+3. The frontend reads the contract using its address and ABI.
+4. The user connects MetaMask and chooses a candidate.
+5. MetaMask asks the user to approve the transaction.
+6. The contract checks the vote and updates the totals if everything is valid.
+7. The frontend reloads the election data after the transaction succeeds.
 
-## Repository map
+The important part is that the contract checks the rules itself. The website can disable a button or show an error, but someone could call the contract without using the website.
+
+## Files worth knowing
 
 | File | What it does |
 | --- | --- |
-| src/Voting.sol | The rules for an election and the data stored on-chain. |
-| test/Voting.t.sol | Tests for valid votes and cases the contract should reject. |
-| script/DeployVoting.s.sol | Foundry deployment script and example election setup. |
-| foundry.toml | Foundry compiler, test, and project settings. |
-| .github/workflows/ci.yml | Runs formatting, compilation, contract tests, and frontend build on GitHub. |
-| frontend/src/App.tsx | Page layout and wallet, election, and transaction state. |
-| frontend/src/contract.ts | Contract ABI, environment values, provider creation, and error formatting. |
-| frontend/src/sponsoredVoting.ts | Optional Alchemy Wallet APIs flow for sponsored voting on Sepolia. |
-| frontend/src/style.css | Page layout, colors, type, responsive rules, and focus styles. |
-| frontend/.env.example | Safe template for local frontend configuration. |
+| `src/Voting.sol` | Stores the election and checks votes. |
+| `test/Voting.t.sol` | Tests normal votes and cases that should fail. |
+| `script/DeployVoting.s.sol` | Deploys an example election. |
+| `foundry.toml` | Foundry project settings. |
+| `.github/workflows/ci.yml` | Runs the checks on GitHub. |
+| `frontend/src/App.tsx` | The page, wallet connection, and vote flow. |
+| `frontend/src/contract.ts` | ABI, environment settings, and contract connection. |
+| `frontend/src/sponsoredVoting.ts` | Optional Alchemy-sponsored vote flow. |
+| `frontend/src/style.css` | Page layout and styling. |
 
-## 1. The smart contract
+## The contract
 
-src/Voting.sol is the source of truth for the election.
+The source is `src/Voting.sol`.
 
-### Constructor
+When the contract is deployed, its constructor gets an election title, candidate names, and a deadline. It checks that the title and candidate list aren't empty, that candidate names are valid, that there aren't more than 100 candidates, and that the deadline is in the future.
 
-When the contract is deployed, the constructor receives an election title, an array of candidate names, and a Unix timestamp for the deadline.
+Candidate IDs start at `0`, so the first candidate is ID 0.
 
-It rejects an empty title, an empty candidate list, more than 100 candidates, empty candidate names, or a deadline that has already passed. It stores the owner, title, and deadline, then adds each candidate.
+When `vote(candidateId)` is called, the contract checks that the deadline hasn't passed, the wallet hasn't voted already, and the candidate ID exists. If all checks pass, it increments that candidate's votes and the total vote count, then emits an event.
 
-Candidate IDs start at zero, so candidate 0 is the first candidate.
+The vote limit is per wallet address, not per person. The contract can't tell whether one person controls several wallets.
 
-### Casting a vote
+## Tests
 
-The vote(candidateId) function checks that the election is still open, the caller has not already voted, and the candidate ID exists. A successful vote updates that candidate's count and the total vote count, then emits a VoteCast event.
+The tests in `test/Voting.t.sol` use Foundry, so you can run them without deploying to a public network. From the repo root:
 
-These checks happen in the contract itself. Disabling a button in the frontend helps the user, but it is not a security rule. Someone can call the contract without using this UI, so the contract must enforce the rules.
-
-### Results and limits
-
-Vote counts and transaction history are public. Wallet addresses do not prove real-world identity or eligibility, and one person can control multiple wallets. This is a learning project, not a private or secure election system.
-
-## 2. Contract tests
-
-test/Voting.t.sol uses Foundry to test the contract without a public network. Tests create a contract, call its functions, and check results or expected reverts.
-
-Run these commands from the repository root:
-
-~~~bash
+```bash
 forge build
 forge test -vv
 forge fmt --check
-~~~
+```
 
-forge build checks compilation, forge test runs the tests, and forge fmt --check checks Solidity formatting without changing files.
+`forge build` compiles the contract, `forge test` runs the tests, and `forge fmt --check` checks formatting without changing files.
 
-## 3. Frontend configuration
+## How the frontend connects
 
-Create frontend/.env.local from frontend/.env.example and set these values:
+The frontend uses the ABI to know which contract functions it can call. The contract address tells it where the deployed election lives. The RPC URL is how it reads blockchain data.
 
-~~~dotenv
+`loadElection` in `frontend/src/App.tsx` reads the title, deadline, vote count, candidate names and totals, and whether the connected wallet has voted. React state holds that data so the page can update when it changes.
+
+When the user connects MetaMask, the app asks for permission to see the active public address. It checks the chain ID too, because the same contract address won't necessarily point to the same thing on different networks. The app listens for account and network changes while it is open.
+
+MetaMask keeps the private key. This app doesn't ask for it.
+
+## What happens when Vote is clicked
+
+The app checks the connected wallet and network before submitting the vote. There are two possible transaction paths.
+
+### Regular transaction
+
+If sponsorship isn't configured, the app sends `vote(candidateId)` through MetaMask. The wallet pays the network fee.
+
+### Alchemy gas sponsorship
+
+If both `VITE_ALCHEMY_API_KEY` and `VITE_ALCHEMY_POLICY_ID` are configured, `frontend/src/sponsoredVoting.ts` uses Alchemy Wallet APIs to submit the encoded vote call with a request for sponsorship. It checks the Sepolia network and verifies the active account and chain before sending.
+
+Alchemy's policy decides whether to cover the fee. The policy needs to be active, have budget available, and allow the contract call. The first use may also show an EIP-7702 authorization prompt in MetaMask. Review that prompt before approving it.
+
+After the transaction finishes, the frontend reloads the election data. If the wallet rejects the request or the transaction fails, the app shows an error instead.
+
+## Environment settings
+
+Create `frontend/.env.local` from `frontend/.env.example`. For Sepolia, the values look like this:
+
+```dotenv
 VITE_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_API_KEY
 VITE_CHAIN_ID=11155111
 VITE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
-
-# Optional, only when an active Sepolia sponsorship policy is set up
 VITE_ALCHEMY_API_KEY=YOUR_ALCHEMY_API_KEY
-VITE_ALCHEMY_POLICY_ID=YOUR_GAS_SPONSORSHIP_POLICY_ID
-~~~
+VITE_ALCHEMY_POLICY_ID=YOUR_SEPOLIA_POLICY_ID
+```
 
-The RPC URL and contract address must refer to the same network. Sepolia's chain ID is 11155111. Local Anvil normally uses 31337.
+For local Anvil, the usual chain ID is `31337` and the RPC URL is `http://127.0.0.1:8545`.
 
-Vite exposes variables beginning with VITE_ to browser code. Treat these values as public. Never put a wallet private key or seed phrase in a frontend environment file. Restrict the Alchemy key in the dashboard where possible.
+Anything starting with `VITE_` is included in the browser build. These are public settings, not a safe place for a private key or seed phrase. Restrict the Alchemy key in its dashboard where possible.
 
-## 4. How the frontend reads the contract
+## A few limitations
 
-contract.ts contains a small ABI, which is the list of contract functions the frontend needs. It creates an ethers JSON-RPC provider for read calls and a browser provider for MetaMask. getVotingContract combines the configured address, ABI, and provider into an object that can call the contract.
+- Votes and wallet addresses are public.
+- There is no identity or eligibility check.
+- The candidate list and deadline are fixed at deployment.
+- Sponsorship can fail or run out of budget.
+- The contract hasn't been professionally audited and isn't for real elections.
 
-loadElection in App.tsx reads the title, deadline, total vote count, candidate count, open/closed status, and whether the connected wallet has voted. It then loads each candidate's name and vote count and saves the result in React state so the page updates.
+## Run the frontend
 
-## 5. How wallet connection works
-
-When the user clicks Connect wallet, the app asks MetaMask for permission to see the active account. It also reads the chain ID. The app only enables voting when the wallet network matches VITE_CHAIN_ID.
-
-MetaMask emits account and network change events. The page listens for those events so it can update if the user switches account or network while the page is open.
-
-The app never requests a private key. MetaMask keeps the key and asks the user to approve transactions.
-
-## 6. What happens when Vote is clicked
-
-The app checks that a wallet is connected, that it is on the configured network, and that the election appears open. It then follows one of two paths.
-
-### Normal MetaMask transaction
-
-If sponsorship is not configured, the frontend gets a MetaMask signer, calls vote(candidateId) on the contract, and waits for the transaction receipt. The wallet pays the gas fee.
-
-### Optional Alchemy gas sponsorship
-
-If both VITE_ALCHEMY_API_KEY and VITE_ALCHEMY_POLICY_ID are present, sponsoredVoting.ts sends the encoded vote call through Alchemy Wallet APIs and requests sponsorship using that policy ID. The policy must be active, configured for Sepolia, and allow the call. A configured policy does not guarantee that every transaction will be sponsored. Review every MetaMask prompt.
-
-After either path confirms, the app reloads the election totals. If a transaction fails or is rejected, the page displays an error message.
-
-## 7. Styling and page layout
-
-style.css uses a small set of neutral colors, a system font stack, thin borders, simple buttons, and a single-column candidate list. It does not load an icon library or external fonts. There are no gradients or decorative animations. The media queries adapt the header, summary, and candidate rows for narrower screens.
-
-## 8. Run the app
-
-From the repository root:
-
-~~~bash
+```bash
 cd frontend
 npm install
 cp .env.example .env.local
-# Edit .env.local, then run:
+# Edit .env.local, then start the app:
 npm run dev
-~~~
+```
 
-To check the production build:
-
-~~~bash
-npm run build
-~~~
-
-Keep the local environment file out of commits. If you change .env.local, restart Vite so it loads the new values.
-
-## 9. Deployment safety
-
-- Use a dedicated test wallet for Sepolia.
-- Keep private keys and seed phrases out of chat, source files, and Git history.
-- Deployment requires test ETH unless you use a local chain such as Anvil.
-- The frontend RPC key and sponsorship policy ID are public browser configuration, not private credentials.
-- Never use this demo to run a real election.
-
-
-## Alchemy gas sponsorship details
-
-The frontend uses `@alchemy/wallet-apis` v5 with Viem to send the encoded `vote(candidateId)` call. This is Alchemy's current Wallet APIs approach and successor to the older Account Kit wallet-client package. It does not integrate Account Kit's embedded sign-in UI; MetaMask remains the signer.
-
-`frontend/src/sponsoredVoting.ts` checks that sponsorship settings exist, the configured chain is Sepolia, the contract address is valid, and the active MetaMask account and chain have not changed. It builds a Viem wallet client over MetaMask's injected provider, creates an Alchemy smart wallet client, configures the gas policy ID, ABI-encodes the vote call, submits it, and waits for the call status.
-
-The gas policy must allow the contract call and have available limits/budget. Alchemy can reject an ineligible call, and a configured policy does not guarantee sponsorship. The initial Wallet APIs interaction may require an EIP-7702 authorization in MetaMask. Never approve wallet prompts you do not understand.
-
-Environment variables prefixed with `VITE_` are public in the browser bundle. The Alchemy API key and policy ID must not be treated as private secrets; never place a wallet private key or seed phrase in the frontend.
+To check the frontend build, run `npm run build` from the `frontend` directory. Keep `.env.local` out of Git and restart Vite after changing it.
