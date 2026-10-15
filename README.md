@@ -28,6 +28,8 @@ The frontend supports wallet connection, candidate/result display, network check
 
 ## Frontend: MetaMask and Alchemy
 
+For the full code walkthrough, see [`docs/CODE_WALKTHROUGH.md`](docs/CODE_WALKTHROUGH.md). The demo's [privacy notice](docs/PRIVACY.md) and [terms of use](docs/TERMS.md) explain its scope and limitations.
+
 See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to approve vote signatures. With Alchemy sponsorship configured, vote calls are submitted through Alchemy Wallet APIs and request policy-based gas coverage. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election. See the frontend README for the optional sponsorship setup.
 
 From the repository root:
