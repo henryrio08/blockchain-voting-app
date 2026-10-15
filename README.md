@@ -14,34 +14,35 @@ A small educational smart-contract project demonstrating on-chain election setup
 - Use Solidity custom errors for explicit failure cases.
 - Test expected behavior and invalid inputs with Foundry.
 - Run formatting, compilation, and tests in GitHub Actions.
+- Sign in with email or Google through Privy embedded wallets; no browser wallet extension required.
+- Submit eligible Sepolia votes through Alchemy Wallet APIs with policy-based gas sponsorship.
 
 ## Tech stack
 
-- Solidity `^0.8.24`
-- Foundry: `forge`, `cast`, and `anvil`
+- Solidity ^0.8.24
+- Foundry: forge, cast, and anvil
 - GitHub Actions for continuous integration
-- React + TypeScript frontend with MetaMask wallet connection
-- Alchemy-compatible RPC configuration for blockchain reads
-- GitHub Actions for Solidity checks and frontend build
+- React + TypeScript frontend
+- Privy for embedded-wallet authentication and key custody
+- Ethers for contract reads
+- Viem and Alchemy Wallet APIs for sponsored transactions
 
-The frontend supports wallet connection, candidate/result display, network checks, and MetaMask-approved voting transactions. Optional Alchemy gas sponsorship is implemented for Sepolia through Alchemy Wallet APIs; it only works after an active sponsorship policy is configured and the vote satisfies that policy.
+## Frontend setup
 
-## Frontend: MetaMask and Alchemy
-
-For the full code walkthrough, see [`docs/CODE_WALKTHROUGH.md`](docs/CODE_WALKTHROUGH.md). The demo's [privacy notice](docs/PRIVACY.md) and [terms of use](docs/TERMS.md) explain its scope and limitations.
-
-See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to approve vote signatures. With Alchemy sponsorship configured, vote calls are submitted through Alchemy Wallet APIs and request policy-based gas coverage. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election. See the frontend README for the optional sponsorship setup.
+For setup instructions, see [frontend/README.md](frontend/README.md). The [code walkthrough](docs/CODE_WALKTHROUGH.md) explains the contract, authentication, and transaction flow. The [privacy notice](docs/PRIVACY.md) and [terms of use](docs/TERMS.md) explain the demo's scope and limitations.
 
 From the repository root:
 
-```bash
+~~~bash
 cd frontend
 npm install
 cp .env.example .env.local
 npm run dev
-```
+~~~
 
-The Alchemy RPC key used by a browser app is visible in network requests. Restrict it in Alchemy's dashboard; never put a wallet private key in frontend environment variables.
+Before signing in, configure the Privy app ID, Alchemy Sepolia RPC URL, deployed contract address, and Alchemy sponsorship policy. The policy must be linked to the same Alchemy app and allow the voting contract call. A configured policy does not guarantee that every vote will be sponsored.
+
+The frontend uses Privy for sign-in and embedded-wallet key custody. Alchemy Wallet APIs submits the vote and requests sponsorship. The app never requests a seed phrase or wallet private key. Browser environment variables prefixed with VITE_ are public configuration; restrict the Alchemy API key by origin and usage where possible.
 
 ## Requirements
 
@@ -50,117 +51,117 @@ The Alchemy RPC key used by a browser app is visible in network requests. Restri
 
 Verify your installation:
 
-```bash
+~~~bash
 forge --version
 anvil --version
 cast --version
-```
+~~~
 
 ## Install and test
 
 Clone the repository, enter its directory, and install the Foundry test library:
 
-```bash
+~~~bash
 git clone https://github.com/henryrio08/blockchain-voting-app.git
 cd blockchain-voting-app
 forge install foundry-rs/forge-std
 forge build
 forge test -vv
 forge fmt --check
-```
+~~~
 
-If you have already cloned the repository, skip the `git clone` and `cd` commands. The `forge-std` dependency is ignored by Git in this project, so install it locally before running tests.
+If you have already cloned the repository, skip the git clone and cd commands. The forge-std dependency is ignored by Git in this project, so install it locally before running tests.
 
 ## Run a local blockchain
 
 In terminal 1:
 
-```bash
+~~~bash
 anvil
-```
+~~~
 
-Keep Anvil running. It creates local development accounts with test ETH and listens on `http://127.0.0.1:8545` by default.
+Keep Anvil running. It creates local development accounts with test ETH and listens on http://127.0.0.1:8545 by default.
 
 In terminal 2, from the repository directory, create a local environment file:
 
-```bash
+~~~bash
 cp .env.example .env
-```
+~~~
 
-Put the RPC URL and a **local Anvil test private key** in `.env`:
+Put the RPC URL and a **local Anvil test private key** in .env:
 
-```bash
+~~~dotenv
 RPC_URL=http://127.0.0.1:8545
 PRIVATE_KEY=PASTE_ANVIL_TEST_PRIVATE_KEY_HERE
-```
+~~~
 
 Load the environment variables into the current terminal:
 
-```bash
+~~~bash
 set -a
 source .env
 set +a
-```
+~~~
 
 Deploy the contract:
 
-```bash
+~~~bash
 forge script script/DeployVoting.s.sol:DeployVoting \
   --rpc-url "$RPC_URL" \
   --broadcast
-```
+~~~
 
-The script deploys an election called `Demo Election` with three example candidates and a deadline seven days after deployment. Save the contract address printed in the output.
+The script deploys an election called Demo Election with three example candidates and a deadline seven days after deployment. Save the contract address printed in the output.
 
-**Never commit `.env`, paste private keys into chat, or use a real wallet's private key for this exercise.** Anvil's default private keys are publicly known and must only be used with the local test chain.
+**Never commit .env, paste private keys into chat, or use a real wallet's private key for this exercise.** Anvil's default private keys are publicly known and must only be used with the local test chain.
 
 ## Interact with the deployed contract
 
-Replace `YOUR_CONTRACT_ADDRESS` with the address printed by the deployment script:
+Replace YOUR_CONTRACT_ADDRESS with the address printed by the deployment script:
 
-```bash
+~~~bash
 cast call YOUR_CONTRACT_ADDRESS "title()(string)" --rpc-url "$RPC_URL"
 cast call YOUR_CONTRACT_ADDRESS "candidateCount()(uint256)" --rpc-url "$RPC_URL"
 cast call YOUR_CONTRACT_ADDRESS "totalVotes()(uint256)" --rpc-url "$RPC_URL"
-```
+~~~
 
 These are read-only calls; they do not submit transactions or change contract state.
 
 ## Contract behavior
 
 - The constructor validates the title, candidate list, candidate names, maximum of 100 candidates, and future deadline.
-- Candidate IDs are zero-based: the first candidate is ID `0`.
-- `vote(candidateId)` checks the deadline, whether the caller already voted, and whether the candidate ID exists before updating state.
-- `hasVoted(address)` records whether an address has voted in this election.
-- `totalVotes` tracks the total successful votes and should equal the sum of candidate vote counts.
-- `results()` returns live, publicly visible results.
-- `finalize()` returns results only after the deadline. It is a read-only function and **does not write a permanent finalized flag**.
+- Candidate IDs are zero-based: the first candidate is ID 0.
+- vote(candidateId) checks the deadline, whether the caller already voted, and whether the candidate ID exists before updating state.
+- hasVoted(address) records whether an address has voted in this election.
+- totalVotes tracks the total successful votes and should equal the sum of candidate vote counts.
+- results() returns live, publicly visible results.
+- finalize() returns results only after the deadline. It is a read-only function and **does not write a permanent finalized flag**.
 - Transactions are atomic: if a call reverts, its state changes are rolled back.
 
 Block timestamps are controlled by the chain and should not be treated as a precision clock.
 
 ## Project layout
 
-```text
+~~~text
 src/Voting.sol                 Smart contract
 test/Voting.t.sol              Foundry unit tests
 script/DeployVoting.s.sol      Deployment script
 foundry.toml                   Foundry configuration
 .env.example                   Environment variable template
 .github/workflows/ci.yml       Automated build, test, and format check
-```
+~~~
 
 ## Continuous integration
 
-On pushes and pull requests targeting `main`, GitHub Actions installs Foundry and `forge-std`, then runs:
+On pushes and pull requests targeting main, GitHub Actions installs Foundry and forge-std, then runs:
 
-```bash
+~~~bash
 forge fmt --check
 forge build
 forge test -vv
-```
+~~~
 
-A green workflow means those checks passed in CI for that revision. Always inspect the workflow result rather than assuming a commit was tested successfully.
+The frontend job runs npm install and npm run build. A green workflow means those checks passed for that revision. Always inspect the workflow result rather than assuming a commit was tested successfully.
 
 ## Limitations and security considerations
 
