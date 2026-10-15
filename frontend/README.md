@@ -1,101 +1,86 @@
 # Voting dApp frontend
 
-A React + TypeScript frontend for the educational Voting contract. MetaMask signs transactions; the configured RPC endpoint (Alchemy on Sepolia, or Anvil locally) is used to read the contract.
+A small React and TypeScript interface for the educational Voting contract. The UI is intentionally simple so election data and the transaction flow are the main focus.
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
 - MetaMask browser extension
-- A deployed instance of `src/Voting.sol` on the network you configure
+- A deployed Voting contract on the network you configure
 
 ## Setup
 
 From the repository root:
 
-```bash
+~~~bash
 cd frontend
 npm install
 cp .env.example .env.local
-```
+~~~
 
-Edit `.env.local` and set the RPC URL, chain ID, and deployed contract address.
+Edit frontend/.env.local and set the RPC URL, chain ID, and deployed contract address.
 
-### Sepolia testnet with Alchemy
+### Sepolia
 
-1. Create an app for Ethereum Sepolia in the [Alchemy dashboard](https://dashboard.alchemy.com/).
-2. Copy its HTTPS RPC URL into `VITE_RPC_URL`.
-3. Set `VITE_CHAIN_ID=11155111`.
-4. Deploy the contract to Sepolia with a disposable test wallet and put the resulting address in `VITE_CONTRACT_ADDRESS`.
-5. Add Sepolia to MetaMask.
-6. To enable gas sponsorship, create an active **Gas Sponsorship** policy for your Alchemy app and Ethereum Sepolia in the Alchemy dashboard. Start with conservative per-transaction and total spend/count limits. Copy the app API key and policy ID into the optional variables below.
-7. Obtain Sepolia test ETH only if you need to deploy or test the unsponsored fallback; eligible sponsored votes should not require the voter to hold Sepolia ETH.
+1. Create an Ethereum Sepolia app in the Alchemy dashboard.
+2. Copy its HTTPS RPC URL into VITE_RPC_URL.
+3. Set VITE_CHAIN_ID=11155111.
+4. Deploy the contract to Sepolia and set VITE_CONTRACT_ADDRESS to the address printed by Foundry.
+5. Add Sepolia to MetaMask and get test ETH for deployment or normal, unsponsored votes.
+6. Optional: create an active Alchemy Gas Sponsorship policy for Sepolia, then set VITE_ALCHEMY_API_KEY and VITE_ALCHEMY_POLICY_ID.
 
 Example:
 
-```dotenv
+~~~dotenv
 VITE_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_API_KEY
 VITE_CHAIN_ID=11155111
 VITE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
 
-# Optional: turn on Alchemy-sponsored vote calls (requires an active Sepolia policy)
+# Optional sponsorship
 VITE_ALCHEMY_API_KEY=YOUR_ALCHEMY_API_KEY
 VITE_ALCHEMY_POLICY_ID=YOUR_GAS_SPONSORSHIP_POLICY_ID
-```
+~~~
 
 ### Local Anvil
 
-Start a local chain from the repository root in one terminal:
+Start Anvil from the repository root in one terminal:
 
-```bash
+~~~bash
 anvil
-```
+~~~
 
-In `frontend/.env.local`, use:
+Configure the frontend for the local chain:
 
-```dotenv
+~~~dotenv
 VITE_RPC_URL=http://127.0.0.1:8545
 VITE_CHAIN_ID=31337
 VITE_CONTRACT_ADDRESS=0xYourLocallyDeployedContractAddress
-```
+~~~
 
-Add Anvil as a custom network in MetaMask:
-- Network name: Anvil Local
-- RPC URL: `http://127.0.0.1:8545`
-- Chain ID: `31337`
-- Currency symbol: `ETH`
+Add Anvil as a custom network in MetaMask with RPC URL http://127.0.0.1:8545 and chain ID 31337. Use only local development accounts with Anvil.
 
-Deploy the contract locally using the repository's Foundry deployment script. Use only an Anvil development account with test ETH; Anvil private keys are public and must never be used on a real network.
+## Run and build
 
-## Run the app
-
-```bash
+~~~bash
 npm run dev
-```
-
-Open the local URL Vite prints. To check the production build:
-
-```bash
 npm run build
 npm run preview
-```
+~~~
 
-## Architecture
+Vite prints a local URL when the development server starts. Restart it after changing .env.local.
 
-- `src/contract.ts`: minimal ABI, chain configuration, and provider helpers.
-- Alchemy/local RPC provider: reads election data without requiring a wallet connection.
-- MetaMask: exposes the connected account and approves the user's signatures. The app never asks for a private key.
-- `src/sponsoredVoting.ts`: optional Alchemy Wallet APIs flow. When both sponsorship settings are present, it submits the vote through Alchemy's smart-wallet client with the configured policy ID and waits for confirmation.
-- `src/App.tsx`: election dashboard, candidate vote counts, wallet/network handling, and transaction feedback.
+## How the code works
 
-### Gas sponsorship behavior
+- src/App.tsx loads election information, connects MetaMask, checks the network, displays candidate totals, and submits votes.
+- src/contract.ts holds the contract ABI and environment configuration. It creates the RPC and MetaMask providers.
+- src/sponsoredVoting.ts handles the optional Alchemy Wallet APIs path. If sponsorship is not configured, the app sends a normal MetaMask transaction.
+- src/style.css contains the responsive layout and visual styling.
 
-Gas sponsorship is **optional and only configured for Sepolia** in this demo. If both `VITE_ALCHEMY_API_KEY` and `VITE_ALCHEMY_POLICY_ID` are set, vote submissions use Alchemy Wallet APIs and request sponsorship. Alchemy only covers the fee if the policy is active, the network is enabled, and the transaction passes its policy rules. If those variables are not set, the app uses a normal MetaMask transaction, which requires the voter to have Sepolia ETH.
+For a deeper explanation of the contract, tests, wallet flow, gas sponsorship, and security limits, read ../docs/CODE_WALKTHROUGH.md.
 
-The first sponsored transaction may ask MetaMask to approve an EIP-7702 delegation as well as the transaction, depending on the wallet and SDK. Review every prompt before signing. The public frontend API key and policy ID are not secrets; restrict the key by allowed origins and usage limits. Never add a wallet private key to a `VITE_*` variable.
+## Security and privacy notes
 
-The app never asks for or handles a private key. The Alchemy key is embedded in frontend browser requests because Vite's `VITE_*` variables are public client-side configuration, not secrets. Restrict the Alchemy key by allowed origins and usage limits in the Alchemy dashboard; never put a wallet private key in a `VITE_*` variable.
+The app does not ask for or handle private keys. VITE_ variables are included in browser code, so the Alchemy API key and policy ID are public configuration. Restrict the API key by origin and usage in Alchemy where possible.
 
-## Limitations
-
-This is an educational demonstration, not a secure election system. Wallet addresses do not establish voter identity or eligibility, one person can use multiple wallets, and on-chain votes are public. The contract has not been professionally audited. The UI must be configured with a deployed contract on the same network selected in MetaMask.
+The app does not collect an account profile or send data to a project-owned backend. Blockchain transactions and wallet addresses are public. Using the app requires MetaMask and the configured RPC provider. This is not a secure election system and should not be used for real elections.
