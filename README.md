@@ -1,174 +1,91 @@
-# Blockchain Voting Application
+# Blockchain Voting App
 
-A small educational smart-contract project demonstrating on-chain election setup, one-wallet-one-vote enforcement, public vote totals, and automated testing with Foundry.
+I built this project to learn more about Solidity and how a smart contract connects to a website. You can create an election with a fixed list of candidates, connect a wallet, and vote. The contract keeps track of the votes on the blockchain.
 
-> **Important:** This is a learning project, not a secure or private voting system for real elections. It does not verify voter identity or eligibility, prevent one person from using multiple wallets, hide ballots, or resist coercion. It has not been professionally tested.
+The project uses Sepolia for testing and has an optional Alchemy gas sponsorship flow. This is still a learning project, not something to use for a real election.
 
-## Features
+## What it does
 
-- Deploy an election with a title, fixed candidate list, and deadline.
-- Allow each address to vote at most once.
-- Reject votes for unknown candidates and votes submitted at or after the deadline.
-- Track each candidate's votes and the total number of votes.
-- Emit events when candidates are added and votes are cast.
-- Use Solidity custom errors for explicit failure cases.
-- Test expected behavior and invalid inputs with Foundry.
-- Run formatting, compilation, and tests in GitHub Actions.
+- Creates an election with a title, candidates, and a deadline.
+- Lets a wallet vote once in that election.
+- Rejects votes for candidates that don't exist and votes after the deadline.
+- Keeps vote totals on-chain, so anyone can read them.
+- Includes Foundry tests for the contract.
+- Uses a React and TypeScript frontend with MetaMask.
+- Can request gas sponsorship through Alchemy Wallet APIs when the Sepolia policy is configured.
 
-## Tech stack
+The contract is responsible for enforcing the voting rules. The frontend makes it easier to use, but it isn't what prevents someone from voting twice.
 
-- Solidity `^0.8.24`
-- Foundry: `forge`, `cast`, and `anvil`
-- GitHub Actions for continuous integration
-- React + TypeScript frontend with MetaMask wallet connection
-- Alchemy-compatible RPC configuration for blockchain reads
-- GitHub Actions for Solidity checks and frontend build
+## Tech used
 
-The frontend supports wallet connection, candidate/result display, network checks, and MetaMask-approved voting transactions. Optional Alchemy gas sponsorship is implemented for Sepolia through Alchemy Wallet APIs; it only works after an active sponsorship policy is configured and the vote satisfies that policy.
+- Solidity
+- Foundry (`forge`, `cast`, and `anvil`)
+- React, TypeScript, and Vite
+- MetaMask
+- Alchemy RPC and optional gas sponsorship
+- GitHub Actions for builds and tests
 
-## Frontend: MetaMask and Alchemy
+## How the parts fit together
 
-For the full code walkthrough, see [`docs/CODE_WALKTHROUGH.md`](docs/CODE_WALKTHROUGH.md). The demo's [privacy notice](docs/PRIVACY.md) and [terms of use](docs/TERMS.md) explain its scope and limitations.
+The contract in `src/Voting.sol` stores the election and checks each vote. Foundry is used to build, test, and deploy it. The frontend in `frontend/` reads the contract and lets someone connect MetaMask and submit a vote.
 
-See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to approve vote signatures. With Alchemy sponsorship configured, vote calls are submitted through Alchemy Wallet APIs and request policy-based gas coverage. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election. See the frontend README for the optional sponsorship setup.
+When someone votes, MetaMask asks them to approve the transaction. If Alchemy sponsorship is set up and the transaction matches the policy, Alchemy may cover the gas fee. Sponsorship is optional and isn't guaranteed for every transaction.
 
-From the repository root:
+For a closer look at the code, see [the code walkthrough](docs/CODE_WALKTHROUGH.md).
 
-```bash
-cd frontend
-npm install
-cp .env.example .env.local
-npm run dev
-```
+## Run the contract tests
 
-The Alchemy RPC key used by a browser app is visible in network requests. Restrict it in Alchemy's dashboard; never put a wallet private key in frontend environment variables.
-
-## Requirements
-
-- macOS, Linux, or Windows with a supported Foundry setup
-- [Foundry](https://book.getfoundry.sh/getting-started/installation)
-
-Verify your installation:
+You'll need [Foundry](https://book.getfoundry.sh/getting-started/installation). From the repository root, run:
 
 ```bash
-forge --version
-anvil --version
-cast --version
-```
-
-## Install and test
-
-Clone the repository, enter its directory, and install the Foundry test library:
-
-```bash
-git clone https://github.com/henryrio08/blockchain-voting-app.git
-cd blockchain-voting-app
 forge install foundry-rs/forge-std
 forge build
 forge test -vv
 forge fmt --check
 ```
 
-If you have already cloned the repository, skip the `git clone` and `cd` commands. The `forge-std` dependency is ignored by Git in this project, so install it locally before running tests.
+The first command installs the test library used by this project. You only need to do that once for your local checkout.
 
-## Run a local blockchain
+## Run the frontend
 
-In terminal 1:
-
-```bash
-anvil
-```
-
-Keep Anvil running. It creates local development accounts with test ETH and listens on `http://127.0.0.1:8545` by default.
-
-In terminal 2, from the repository directory, create a local environment file:
+You'll need Node.js 20 or newer and MetaMask. From the repository root:
 
 ```bash
-cp .env.example .env
+cd frontend
+npm install
+cp .env.example .env.local
 ```
 
-Put the RPC URL and a **local Anvil test private key** in `.env`:
+Open `frontend/.env.local` and set the RPC URL, chain ID, and contract address. Then start the dev server:
 
 ```bash
-RPC_URL=http://127.0.0.1:8545
-PRIVATE_KEY=PASTE_ANVIL_TEST_PRIVATE_KEY_HERE
+npm run dev
 ```
 
-Load the environment variables into the current terminal:
+For local development, you can use Anvil. For the Sepolia setup and optional gas sponsorship, follow [the frontend instructions](frontend/README.md).
 
-```bash
-set -a
-source .env
-set +a
-```
+You need a deployed contract address for the frontend to show an election. The README doesn't include a live demo link because a hosted frontend and its contract configuration need to be set up separately.
 
-Deploy the contract:
+## A few things to know
 
-```bash
-forge script script/DeployVoting.s.sol:DeployVoting \
-  --rpc-url "$RPC_URL" \
-  --broadcast
-```
-
-The script deploys an election called `Demo Election` with three example candidates and a deadline seven days after deployment. Save the contract address printed in the output.
-
-**Never commit `.env`, paste private keys into chat, or use a real wallet's private key for this exercise.** Anvil's default private keys are publicly known and must only be used with the local test chain.
-
-## Interact with the deployed contract
-
-Replace `YOUR_CONTRACT_ADDRESS` with the address printed by the deployment script:
-
-```bash
-cast call YOUR_CONTRACT_ADDRESS "title()(string)" --rpc-url "$RPC_URL"
-cast call YOUR_CONTRACT_ADDRESS "candidateCount()(uint256)" --rpc-url "$RPC_URL"
-cast call YOUR_CONTRACT_ADDRESS "totalVotes()(uint256)" --rpc-url "$RPC_URL"
-```
-
-These are read-only calls; they do not submit transactions or change contract state.
-
-## Contract behavior
-
-- The constructor validates the title, candidate list, candidate names, maximum of 100 candidates, and future deadline.
-- Candidate IDs are zero-based: the first candidate is ID `0`.
-- `vote(candidateId)` checks the deadline, whether the caller already voted, and whether the candidate ID exists before updating state.
-- `hasVoted(address)` records whether an address has voted in this election.
-- `totalVotes` tracks the total successful votes and should equal the sum of candidate vote counts.
-- `results()` returns live, publicly visible results.
-- `finalize()` returns results only after the deadline. It is a read-only function and **does not write a permanent finalized flag**.
-- Transactions are atomic: if a call reverts, its state changes are rolled back.
-
-Block timestamps are controlled by the chain and should not be treated as a precision clock.
+- This app doesn't make votes private. Wallet addresses, transactions, and results are public on the blockchain.
+- A wallet address doesn't prove who someone is or whether they're allowed to vote. One person can use multiple wallets.
+- Candidates and the deadline are set when the contract is deployed.
+- Gas sponsorship depends on an active Alchemy policy and its limits.
+- The contract hasn't been professionally audited, so don't use it for a real election.
 
 ## Project layout
 
 ```text
-src/Voting.sol                 Smart contract
-test/Voting.t.sol              Foundry unit tests
-script/DeployVoting.s.sol      Deployment script
-foundry.toml                   Foundry configuration
-.env.example                   Environment variable template
-.github/workflows/ci.yml       Automated build, test, and format check
+src/Voting.sol                 Voting rules and on-chain data
+test/Voting.t.sol              Contract tests
+script/DeployVoting.s.sol      Example deployment script
+frontend/src/App.tsx            Main page and voting flow
+frontend/src/contract.ts        Contract connection and configuration
+frontend/src/sponsoredVoting.ts Optional Alchemy-sponsored voting
+docs/CODE_WALKTHROUGH.md        Explanation of how the code works
+.github/workflows/ci.yml        Automated checks
 ```
-
-## Continuous integration
-
-On pushes and pull requests targeting `main`, GitHub Actions installs Foundry and `forge-std`, then runs:
-
-```bash
-forge fmt --check
-forge build
-forge test -vv
-```
-
-A green workflow means those checks passed in CI for that revision. Always inspect the workflow result rather than assuming a commit was tested successfully.
-
-## Limitations and security considerations
-
-- **No ballot secrecy:** transactions and vote totals are publicly observable.
-- **No voter eligibility:** a wallet address is not proof of an eligible person.
-- **No coercion resistance:** voters can reveal how they voted.
-- **Fixed candidates and deadline:** they are selected at deployment.
-- **No professional audit:** the code is educational and must not be used for real elections.
 
 ## License
 
