@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@alchemy/wallet-apis": "^5.0.0",
     "ethers": "^6.15.0",
-    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "viem": "^2.21.54"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

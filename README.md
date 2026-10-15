@@ -24,11 +24,13 @@ A small educational smart-contract project demonstrating on-chain election setup
 - Alchemy-compatible RPC configuration for blockchain reads
 - GitHub Actions for Solidity checks and frontend build
 
-The frontend currently supports wallet connection, candidate/result display, network checks, and MetaMask-signed voting transactions. Alchemy Account Kit gas sponsorship is **not implemented**; Alchemy is used as an RPC provider.
+The frontend supports wallet connection, candidate/result display, network checks, and MetaMask-approved voting transactions. Optional Alchemy gas sponsorship is implemented for Sepolia through Alchemy Wallet APIs; it only works after an active sponsorship policy is configured and the vote satisfies that policy.
 
 ## Frontend: MetaMask and Alchemy
 
-See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to sign vote transactions. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election.
+For the full code walkthrough, see [`docs/CODE_WALKTHROUGH.md`](docs/CODE_WALKTHROUGH.md). The demo's [privacy notice](docs/PRIVACY.md) and [terms of use](docs/TERMS.md) explain its scope and limitations.
+
+See [`frontend/README.md`](frontend/README.md) for frontend setup, local Anvil configuration, and Sepolia instructions. The frontend reads contract data through the configured RPC endpoint and uses MetaMask to approve vote signatures. With Alchemy sponsorship configured, vote calls are submitted through Alchemy Wallet APIs and request policy-based gas coverage. You must deploy the contract and set `VITE_CONTRACT_ADDRESS` before the dashboard can display a live election. See the frontend README for the optional sponsorship setup.
 
 From the repository root:
 
@@ -168,7 +170,7 @@ A green workflow means those checks passed in CI for that revision. Always inspe
 - **No coercion resistance:** voters can reveal how they voted.
 - **Fixed candidates and deadline:** they are selected at deployment.
 - **No professional audit:** the code is educational and must not be used for real elections.
-- **No gas sponsorship yet:** Alchemy Account Kit integration remains future work.
+- **Optional gas sponsorship:** the frontend can request Alchemy sponsorship on Sepolia, but an active policy and matching configuration are required; sponsorship is not guaranteed for every transaction.
 
 ## License
 
