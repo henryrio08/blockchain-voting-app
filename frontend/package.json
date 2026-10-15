@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@alchemy/wallet-apis": "^5.0.0",
+    "@privy-io/react-auth": "^3.49.0",
     "ethers": "^6.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
