@@ -140,10 +140,7 @@ function App() {
     }
   };
 
-  useEffect(() => { void loadElection(""); }, [loadElection]);
-  useEffect(() => {
-    if (authenticated && account) void loadElection(account);
-  }, [authenticated, account, loadElection]);
+  useEffect(() => { void loadElection(account); }, [loadElection]);
 
   const deadlineText = election ? new Date(election.deadline).toLocaleString() : "Not available";
   const walletReady = Boolean(signer && account);
