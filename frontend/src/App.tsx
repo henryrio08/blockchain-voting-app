@@ -1,43 +1,66 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toViemAccount, usePrivy, useWallets } from "@privy-io/react-auth";
+import type { LocalAccount } from "viem";
 import {
   configuredChainId, contractAddress, createReadProvider, describeError,
-  formatAddress, getInjectedProvider, getVotingContract, rpcUrl,
+  formatAddress, getVotingContract, rpcUrl,
   type ElectionSnapshot,
 } from "./contract";
 import { gasSponsorshipConfigured, submitSponsoredVote } from "./sponsoredVoting";
-
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-      on?: (event: string, handler: (...args: unknown[]) => void) => void;
-      removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
-    };
-  }
-}
 
 const networkName = configuredChainId === 11155111 ? "Sepolia" :
   configuredChainId === 31337 ? "Local Anvil" : "Chain " + configuredChainId;
 
 function App() {
-  const [account, setAccount] = useState("");
-  const [walletChainId, setWalletChainId] = useState<number | null>(null);
+  const { ready, authenticated, login, logout } = usePrivy();
+  const { wallets } = useWallets();
+
+  // Privy creates an embedded wallet after sign-in. Do not fall back to an injected wallet.
+  const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
+  const account = embeddedWallet?.address || "";
+  const [signer, setSigner] = useState<LocalAccount>();
   const [election, setElection] = useState<ElectionSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [votingFor, setVotingFor] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error" | "info"; text: string } | null>(null);
 
-  const isCorrectNetwork = walletChainId === configuredChainId;
+  const isCorrectNetwork = configuredChainId === 11155111;
   const configured = Boolean(contractAddress && rpcUrl);
+  const canVote = ready && authenticated && Boolean(account && signer) &&
+    isCorrectNetwork && gasSponsorshipConfigured;
 
-  // RPC reads are separate from transactions signed by MetaMask.
+  // Contract reads use the public RPC endpoint and do not need a connected wallet.
   const readProvider = useMemo(() => {
     if (!rpcUrl) return null;
     try { return createReadProvider(); } catch { return null; }
   }, []);
 
-  // Load the election and its candidate totals from the deployed contract.
+  // Convert the Privy embedded wallet into a viem signer for Alchemy Wallet APIs.
+  // Privy handles login and key custody; this app never sees the wallet's private key.
+  useEffect(() => {
+    let cancelled = false;
+    if (!authenticated || !embeddedWallet) {
+      setSigner(undefined);
+      return () => { cancelled = true; };
+    }
+
+    setSigner(undefined);
+    void toViemAccount({ wallet: embeddedWallet })
+      .then((nextSigner) => {
+        if (!cancelled) setSigner(nextSigner);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setSigner(undefined);
+          setNotice({ kind: "error", text: "Could not prepare the embedded wallet. " + describeError(error) });
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [authenticated, embeddedWallet?.address]);
+
+  // Load election details and whether this embedded wallet has already voted.
   const loadElection = useCallback(async (walletAddress = account) => {
     if (!readProvider || !contractAddress) { setElection(null); return; }
     setLoading(true);
@@ -55,102 +78,75 @@ function App() {
         title: String(title), deadline: Number(deadline) * 1000, totalVotes: Number(totalVotes),
         isOpen: Boolean(isOpen), candidates, hasVoted: Boolean(hasVoted),
       });
-      setNotice((current) => current?.kind === "error" ? null : current);
+      setNotice((current) => current?.kind === "error" ? current : null);
     } catch (error) {
       setNotice({ kind: "error", text: describeError(error) });
     } finally { setLoading(false); }
   }, [account, readProvider]);
 
-  const connectWallet = async () => {
+  const startLogin = async () => {
     setNotice(null);
-    setConnecting(true);
     try {
-      const provider = getInjectedProvider();
-      const accounts = await provider.send("eth_requestAccounts", []);
-      const network = await provider.getNetwork();
-      setAccount(accounts[0] || "");
-      setWalletChainId(Number(network.chainId));
-      setNotice(Number(network.chainId) !== configuredChainId
-        ? { kind: "info", text: "Switch MetaMask to " + networkName + " before voting." }
-        : { kind: "success", text: "Wallet connected. Review and approve your vote in MetaMask." });
+      await login();
     } catch (error) {
       setNotice({ kind: "error", text: describeError(error) });
-    } finally { setConnecting(false); }
-  };
-
-  const switchNetwork = async () => {
-    try {
-      await window.ethereum?.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x" + configuredChainId.toString(16) }],
-      });
-    } catch (error) {
-      setNotice({ kind: "error", text: "Switch MetaMask to " + networkName + " and try again. " + describeError(error) });
     }
   };
 
-  const disconnectWallet = () => {
-    // This clears the app's state. Site permissions are still managed in MetaMask.
-    setAccount("");
-    setWalletChainId(null);
-    setNotice({ kind: "info", text: "Wallet disconnected from this app. You can revoke site access in MetaMask." });
+  const disconnectWallet = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      setSigner(undefined);
+      setNotice({ kind: "info", text: "You have signed out. Your embedded wallet remains managed by Privy." });
+    } catch (error) {
+      setNotice({ kind: "error", text: describeError(error) });
+    } finally { setLoggingOut(false); }
   };
 
   const castVote = async (candidateId: number) => {
-    if (!account) { setNotice({ kind: "error", text: "Connect MetaMask before voting." }); return; }
-    if (!isCorrectNetwork) { setNotice({ kind: "error", text: "Switch MetaMask to " + networkName + " before voting." }); return; }
+    if (!authenticated || !account) {
+      setNotice({ kind: "error", text: "Sign in to create or access your embedded wallet before voting." });
+      return;
+    }
+    if (!signer) {
+      setNotice({ kind: "info", text: "Your embedded wallet is still getting ready. Try again in a moment." });
+      return;
+    }
+    if (!isCorrectNetwork) {
+      setNotice({ kind: "error", text: "This demo is configured for Sepolia. Set VITE_CHAIN_ID=11155111." });
+      return;
+    }
+    if (!gasSponsorshipConfigured) {
+      setNotice({ kind: "error", text: "Gas sponsorship is not configured. Add VITE_ALCHEMY_API_KEY and VITE_ALCHEMY_POLICY_ID to frontend/.env.local." });
+      return;
+    }
+
     setVotingFor(candidateId);
-    setNotice({ kind: "info", text: gasSponsorshipConfigured
-      ? "Review the MetaMask request carefully. Alchemy will sponsor gas only if the Sepolia policy allows this vote."
-      : "Review the vote request in MetaMask. Your wallet will pay the transaction gas fee." });
+    setNotice({ kind: "info", text: "Review the transaction details. Alchemy will sponsor gas only if your Sepolia policy allows this vote." });
     try {
-      if (gasSponsorshipConfigured) {
-        // Alchemy covers gas only when the active policy allows this transaction.
-        await submitSponsoredVote(account, candidateId);
-        setNotice({ kind: "success", text: "Sponsored vote confirmed. Refreshing results." });
-      } else {
-        // Without sponsorship, MetaMask sends the transaction and the wallet pays gas.
-        const provider = getInjectedProvider();
-        const signer = await provider.getSigner();
-        const contract = getVotingContract(provider).connect(signer);
-        const tx = await contract.getFunction("vote")(candidateId);
-        setNotice({ kind: "info", text: "Transaction " + tx.hash.slice(0, 12) + "... submitted. Waiting for confirmation." });
-        await tx.wait();
-        setNotice({ kind: "success", text: "Vote confirmed. Refreshing results." });
-      }
+      const transactionHash = await submitSponsoredVote(signer, candidateId);
+      setNotice({
+        kind: "success",
+        text: transactionHash
+          ? "Sponsored vote confirmed. Transaction: " + transactionHash.slice(0, 12) + "… Refreshing results."
+          : "Sponsored vote confirmed. Refreshing results.",
+      });
       await loadElection(account);
     } catch (error) {
       setNotice({ kind: "error", text: describeError(error) });
-    } finally { setVotingFor(null); }
+    } finally {
+      setVotingFor(null);
+    }
   };
 
-  useEffect(() => { void loadElection(); }, [loadElection]);
-
+  useEffect(() => { void loadElection(""); }, [loadElection]);
   useEffect(() => {
-    if (!window.ethereum) return;
-    // Keep the page in sync when the user changes account or network in MetaMask.
-    const handleAccounts = (...args: unknown[]) => {
-      const accounts = args[0] as string[] | undefined;
-      setAccount(accounts?.[0] || "");
-    };
-    const handleChain = (...args: unknown[]) => {
-      const raw = args[0];
-      setWalletChainId(typeof raw === "string" ? Number.parseInt(raw, 16) : null);
-    };
-    window.ethereum.on?.("accountsChanged", handleAccounts);
-    window.ethereum.on?.("chainChanged", handleChain);
-    return () => {
-      window.ethereum?.removeListener?.("accountsChanged", handleAccounts);
-      window.ethereum?.removeListener?.("chainChanged", handleChain);
-    };
-  }, []);
+    if (authenticated && account) void loadElection(account);
+  }, [authenticated, account, loadElection]);
 
-  useEffect(() => {
-    if (account && isCorrectNetwork) void loadElection(account);
-  }, [account, isCorrectNetwork, loadElection]);
-
-  const networkMismatch = Boolean(account && walletChainId !== null && !isCorrectNetwork);
   const deadlineText = election ? new Date(election.deadline).toLocaleString() : "Not available";
+  const walletReady = Boolean(signer && account);
 
   return (
     <main className="page">
@@ -158,11 +154,13 @@ function App() {
         <a className="wordmark" href="#top">Voting demo</a>
         <div className="header-actions">
           <span className="network-label">{networkName}</span>
-          {account ? <>
-            <span className="account-label" title={account}>{formatAddress(account)}</span>
-            <button className="button button-secondary" onClick={disconnectWallet}>Disconnect</button>
-          </> : <button className="button button-primary" onClick={connectWallet} disabled={connecting}>
-            {connecting ? "Connecting..." : "Connect wallet"}
+          {authenticated && account ? <>
+            <span className="account-label" title={account}>Embedded wallet {formatAddress(account)}</span>
+            <button className="button button-secondary" onClick={() => void disconnectWallet()} disabled={loggingOut}>
+              {loggingOut ? "Signing out..." : "Sign out"}
+            </button>
+          </> : <button className="button button-primary" onClick={() => void startLogin()} disabled={!ready}>
+            {!ready ? "Loading..." : "Sign in"}
           </button>}
         </div>
       </header>
@@ -170,7 +168,10 @@ function App() {
       <section className="intro" id="top">
         <p className="eyebrow">BLOCKCHAIN VOTING APPLICATION</p>
         <h1>{election?.title || "On-chain voting"}</h1>
-        <p className="intro-copy">A small demo showing how a Solidity voting contract works. Connect MetaMask to cast a vote and read public results from the blockchain.</p>
+        <p className="intro-copy">
+          A small demo showing how a Solidity voting contract works. Sign in with email or Google to use an embedded wallet.
+          Eligible votes are submitted through Alchemy Wallet APIs, with gas sponsorship subject to the Sepolia policy.
+        </p>
       </section>
 
       {notice && <div className={"notice notice-" + notice.kind} role="status">
@@ -184,14 +185,23 @@ function App() {
         <a href="https://github.com/henryrio08/blockchain-voting-app/blob/main/frontend/README.md">Read setup instructions</a>
       </section>}
 
-      {networkMismatch && <section className="message-block warning">
-        <h2>Wrong network</h2>
-        <p>Your wallet needs to use {networkName} to vote on this contract.</p>
-        <button className="button button-secondary" onClick={switchNetwork}>Switch network</button>
+      {!isCorrectNetwork && <section className="message-block warning">
+        <h2>Network configuration needs attention</h2>
+        <p>This version uses embedded wallets on Sepolia. Set <code>VITE_CHAIN_ID=11155111</code> and use a Sepolia RPC URL.</p>
+      </section>}
+
+      {!gasSponsorshipConfigured && <section className="message-block warning">
+        <h2>Gas sponsorship setup needed</h2>
+        <p>Set <code>VITE_ALCHEMY_API_KEY</code> and <code>VITE_ALCHEMY_POLICY_ID</code> after linking an active Sepolia policy to your Alchemy app. Voting stays disabled until these values are configured.</p>
+      </section>}
+
+      {authenticated && !walletReady && <section className="message-block">
+        <h2>Preparing your embedded wallet</h2>
+        <p>Sign-in succeeded. Privy is making the wallet signer ready for sponsored transactions; this normally takes a moment.</p>
       </section>}
 
       <section className="election-summary" aria-label="Election summary">
-        <div><span className="summary-label">Status</span><strong>{election ? (election.isOpen ? "Open" : "Closed") : "Not configured"}</strong></div>
+        <div><span className="summary-label">Status</span><strong>{election ? (election.isOpen ? "Open" : "Closed") : "Not available"}</strong></div>
         <div><span className="summary-label">Total votes</span><strong>{election ? election.totalVotes : "..."}</strong></div>
         <div><span className="summary-label">Candidates</span><strong>{election ? election.candidates.length : "..."}</strong></div>
         <div><span className="summary-label">Deadline</span><strong className="deadline-value">{deadlineText}</strong></div>
@@ -206,7 +216,7 @@ function App() {
         {election?.candidates.length ? <div className="candidate-list">
           {election.candidates.map((candidate) => {
             const percentage = election.totalVotes ? (candidate.voteCount / election.totalVotes) * 100 : 0;
-            const disabled = !account || !isCorrectNetwork || !election.isOpen || election.hasVoted || votingFor !== null;
+            const disabled = !canVote || !election.isOpen || election.hasVoted || votingFor !== null;
             return <article className="candidate-row" key={candidate.id}>
               <div className="candidate-main">
                 <span className="candidate-id">Candidate {candidate.id + 1}</span>
@@ -216,9 +226,11 @@ function App() {
               </div>
               <div className="candidate-action">
                 <button className="button button-primary vote-button" disabled={disabled} onClick={() => void castVote(candidate.id)}>
-                  {votingFor === candidate.id ? "Waiting for wallet..." :
+                  {votingFor === candidate.id ? "Submitting vote..." :
                     election.hasVoted && account ? "Already voted" :
-                    !account ? "Connect to vote" :
+                    !authenticated ? "Sign in to vote" :
+                    !walletReady ? "Preparing wallet..." :
+                    !gasSponsorshipConfigured ? "Sponsorship setup needed" :
                     !election.isOpen ? "Voting closed" : "Vote"}
                 </button>
               </div>
@@ -235,7 +247,7 @@ function App() {
 
       <section className="project-notes">
         <h2>How this demo works</h2>
-        <p>Reads use the configured RPC endpoint. {gasSponsorshipConfigured ? "Alchemy Wallet APIs sponsorship is configured for Sepolia, but coverage depends on the active policy. MetaMask still asks you to approve wallet actions." : "Normal MetaMask transactions are used, and the connected wallet pays gas."} Votes and wallet addresses are public on-chain.</p>
+        <p>Reads use the configured RPC endpoint. Privy manages embedded-wallet sign-in and key custody. Alchemy Wallet APIs submits vote calls and requests policy-based gas sponsorship; the policy decides which calls it will cover. Votes and wallet addresses are public on-chain.</p>
         <div className="contract-address">
           <span>Contract address</span>
           <code>{contractAddress || "Not configured"}</code>
@@ -247,9 +259,9 @@ function App() {
       <footer className="site-footer">
         <span>Voting demo · Built for learning</span>
         <a href="https://github.com/henryrio08/blockchain-voting-app">Source code</a>
-        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/frontend/README.md">Setup guide</a>
-        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/docs/PRIVACY.md">Privacy</a>
-        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/docs/TERMS.md">Terms</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/main/frontend/README.md">Setup guide</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/main/docs/PRIVACY.md">Privacy</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/main/docs/TERMS.md">Terms</a>
       </footer>
     </main>
   );
