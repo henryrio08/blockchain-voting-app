@@ -11,6 +11,7 @@ import {
 import { sepolia } from "viem/chains";
 import { contractAddress } from "./contract";
 
+// These settings are public in the browser bundle. Restrict the API key in Alchemy.
 const alchemyApiKey = (import.meta.env.VITE_ALCHEMY_API_KEY || "").trim();
 const sponsorshipPolicyId = (import.meta.env.VITE_ALCHEMY_POLICY_ID || "").trim();
 
@@ -24,6 +25,7 @@ const votingAbi = [
   },
 ] as const;
 
+// If either setting is missing, App.tsx falls back to a normal MetaMask transaction.
 export const gasSponsorshipConfigured = Boolean(alchemyApiKey && sponsorshipPolicyId);
 
 export async function submitSponsoredVote(account: string, candidateId: number) {
@@ -44,6 +46,7 @@ export async function submitSponsoredVote(account: string, candidateId: number) 
 
   // MetaMask remains the signer. Alchemy routes the signed call through its
   // smart-wallet infrastructure so an eligible policy can cover transaction gas.
+  // MetaMask is still the signer. The app never handles the wallet's private key.
   const signer = createWalletClient({
     account: account as Address,
     chain: sepolia,
@@ -55,12 +58,14 @@ export async function submitSponsoredVote(account: string, candidateId: number) 
     signer,
   });
 
+  // Encode vote(candidateId) using the same function signature as the Solidity contract.
   const data = encodeFunctionData({
     abi: votingAbi,
     functionName: "vote",
     args: [BigInt(candidateId)],
   });
 
+  // Ask Alchemy to sponsor this call if the policy rules allow it.
   const { id } = await client.sendCalls({
     capabilities: {
       paymaster: {
