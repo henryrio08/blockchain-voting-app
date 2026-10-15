@@ -100,7 +100,9 @@ function App() {
     if (!account) { setNotice({ kind: "error", text: "Connect MetaMask before voting." }); return; }
     if (!isCorrectNetwork) { setNotice({ kind: "error", text: "Switch MetaMask to " + networkName + " before voting." }); return; }
     setVotingFor(candidateId);
-    setNotice({ kind: "info", text: "Review the vote request in MetaMask before approving it." });
+    setNotice({ kind: "info", text: gasSponsorshipConfigured
+      ? "Review the MetaMask request carefully. Alchemy will sponsor gas only if the Sepolia policy allows this vote."
+      : "Review the vote request in MetaMask. Your wallet will pay the transaction gas fee." });
     try {
       if (gasSponsorshipConfigured) {
         // Alchemy covers gas only when the active policy allows this transaction.
@@ -233,7 +235,7 @@ function App() {
 
       <section className="project-notes">
         <h2>How this demo works</h2>
-        <p>Reads use the configured RPC endpoint. MetaMask signs normal votes, or Alchemy's optional sponsorship flow is used when configured. Votes and wallet addresses are public on-chain.</p>
+        <p>Reads use the configured RPC endpoint. {gasSponsorshipConfigured ? "Alchemy Wallet APIs sponsorship is configured for Sepolia, but coverage depends on the active policy. MetaMask still asks you to approve wallet actions." : "Normal MetaMask transactions are used, and the connected wallet pays gas."} Votes and wallet addresses are public on-chain.</p>
         <div className="contract-address">
           <span>Contract address</span>
           <code>{contractAddress || "Not configured"}</code>
