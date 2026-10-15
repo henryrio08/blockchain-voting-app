@@ -245,7 +245,9 @@ function App() {
       <footer className="site-footer">
         <span>Voting demo · Built for learning</span>
         <a href="https://github.com/henryrio08/blockchain-voting-app">Source code</a>
-        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/main/frontend/README.md">Setup and documentation</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/frontend/README.md">Setup guide</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/docs/PRIVACY.md">Privacy</a>
+        <a href="https://github.com/henryrio08/blockchain-voting-app/blob/refactor/plain-voting-ui/docs/TERMS.md">Terms</a>
       </footer>
     </main>
   );
