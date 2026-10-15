@@ -2,7 +2,7 @@
 
 A small educational smart-contract project demonstrating on-chain election setup, one-wallet-one-vote enforcement, public vote totals, and automated testing with Foundry.
 
-> **Important:** This is a learning project, not a secure or private voting system for real elections. It does not verify voter identity or eligibility, prevent one person from using multiple wallets, hide ballots, or resist coercion. It has not been professionally audited.
+> **Important:** This is a learning project, not a secure or private voting system for real elections. It does not verify voter identity or eligibility, prevent one person from using multiple wallets, hide ballots, or resist coercion. It has not been professionally tested.
 
 ## Features
 
@@ -166,11 +166,9 @@ A green workflow means those checks passed in CI for that revision. Always inspe
 
 - **No ballot secrecy:** transactions and vote totals are publicly observable.
 - **No voter eligibility:** a wallet address is not proof of an eligible person.
-- **No Sybil resistance:** one person can control multiple wallets.
 - **No coercion resistance:** voters can reveal how they voted.
 - **Fixed candidates and deadline:** they are selected at deployment.
 - **No professional audit:** the code is educational and must not be used for real elections.
-- **Optional gas sponsorship:** the frontend can request Alchemy sponsorship on Sepolia, but an active policy and matching configuration are required; sponsorship is not guaranteed for every transaction.
 
 ## License
 
