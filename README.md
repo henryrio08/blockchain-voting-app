@@ -4,7 +4,9 @@ I built this project to learn more about Solidity and how a smart contract conne
 
 The project uses Sepolia for testing and has an optional Alchemy gas sponsorship flow. This is still a learning project, not something to use for a real election.
 
-## What it does
+## How voting works
+
+![Blockchain voting flow](docs/images/voting-flow.svg)
 
 - Creates an election with a title, candidates, and a deadline.
 - Lets a wallet vote once in that election.
@@ -64,7 +66,7 @@ npm run dev
 
 For local development, you can use Anvil. For the Sepolia setup and optional gas sponsorship, follow [the frontend instructions](frontend/README.md).
 
-You need a deployed contract address for the frontend to show an election. The README doesn't include a live demo link because a hosted frontend and its contract configuration need to be set up separately.
+You need a deployed contract address for the frontend to show an election. There isn't a live demo link yet because the frontend and contract need to be configured and deployed separately.
 
 ## A few things to know
 
