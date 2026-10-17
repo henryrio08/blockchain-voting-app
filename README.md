@@ -4,6 +4,14 @@ I built this project to learn more about Solidity and how a smart contract conne
 
 The project uses Sepolia for testing and has an optional Alchemy gas sponsorship flow. This is still a learning project, not something to use for a real election.
 
+## Demo
+
+![Blockchain voting app](docs/images/blockchain-voting.png)
+
+This GIF uses a local Anvil chain and a test wallet to show the voting flow. It does not use Sepolia or real funds.
+
+![Voting demo](docs/images/blockchain-voting-demo.gif)
+
 ## How voting works
 
 ![Blockchain voting flow](docs/images/voting-flow.svg)
