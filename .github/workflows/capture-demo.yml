@@ -26,8 +26,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           curl -L https://foundry.paradigm.xyz | bash
-          "$HOME/.foundry/bin/foundryup"
-          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
+          "$HOME/.config/.foundry/bin/foundryup"
+          echo "$HOME/.config/.foundry/bin" >> "$GITHUB_PATH"
           cd frontend
           npm ci
           npm install --no-save playwright
