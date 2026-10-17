@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220" role="img" aria-labelledby="title desc">
+  <title id="title">Blockchain voting flow</title>
+  <desc id="desc">A voter connects MetaMask, submits a vote transaction, the smart contract checks the voting rules, and vote totals are stored on-chain.</desc>
+  <rect width="900" height="220" rx="12" fill="#f7f7f4"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#202522">
+    <rect x="24" y="54" width="184" height="112" rx="8" fill="#ffffff" stroke="#b9c2ba" stroke-width="1.5"/>
+    <text x="116" y="91" text-anchor="middle" font-size="17" font-weight="700">Voter</text>
+    <text x="116" y="118" text-anchor="middle" font-size="13">Chooses a candidate</text>
+    <text x="116" y="138" text-anchor="middle" font-size="13">in the web app</text>
+    <path d="M208 110 H244" stroke="#65776a" stroke-width="2.5" fill="none"/><path d="M237 103 L245 110 L237 117" stroke="#65776a" stroke-width="2.5" fill="none"/>
+    <rect x="246" y="54" width="184" height="112" rx="8" fill="#ffffff" stroke="#b9c2ba" stroke-width="1.5"/>
+    <text x="338" y="91" text-anchor="middle" font-size="17" font-weight="700">MetaMask</text>
+    <text x="338" y="118" text-anchor="middle" font-size="13">Reviews and signs</text>
+    <text x="338" y="138" text-anchor="middle" font-size="13">the transaction</text>
+    <path d="M430 110 H466" stroke="#65776a" stroke-width="2.5" fill="none"/><path d="M459 103 L467 110 L459 117" stroke="#65776a" stroke-width="2.5" fill="none"/>
+    <rect x="468" y="54" width="184" height="112" rx="8" fill="#e4eee4" stroke="#78927c" stroke-width="1.5"/>
+    <text x="560" y="91" text-anchor="middle" font-size="17" font-weight="700">Voting contract</text>
+    <text x="560" y="118" text-anchor="middle" font-size="13">Checks eligibility rules</text>
+    <text x="560" y="138" text-anchor="middle" font-size="13">and records the vote</text>
+    <path d="M652 110 H688" stroke="#65776a" stroke-width="2.5" fill="none"/><path d="M681 103 L689 110 L681 117" stroke="#65776a" stroke-width="2.5" fill="none"/>
+    <rect x="690" y="54" width="186" height="112" rx="8" fill="#ffffff" stroke="#b9c2ba" stroke-width="1.5"/>
+    <text x="783" y="91" text-anchor="middle" font-size="17" font-weight="700">Blockchain</text>
+    <text x="783" y="118" text-anchor="middle" font-size="13">Stores public vote</text>
+    <text x="783" y="138" text-anchor="middle" font-size="13">totals and transactions</text>
+    <text x="450" y="199" text-anchor="middle" font-size="12" fill="#526156">This project uses Sepolia for testing, not real elections.</text>
+  </g>
+</svg>
