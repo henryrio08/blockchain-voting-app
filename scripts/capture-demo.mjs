@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 
-const output = "docs/images";
+const output = "../docs/images";
 await mkdir(output, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
