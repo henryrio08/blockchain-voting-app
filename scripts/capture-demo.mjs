@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium } from "../frontend/node_modules/playwright/index.mjs";
 import { mkdir } from "node:fs/promises";
 
 const output = "../docs/images";
